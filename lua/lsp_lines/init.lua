@@ -8,7 +8,7 @@ local function render_current_line(diagnostics, ns, bufnr, opts)
 
   for _, diagnostic in pairs(diagnostics) do
     local show = diagnostic.end_lnum and (lnum >= diagnostic.lnum and lnum <= diagnostic.end_lnum)
-      or (lnum == diagnostic.lnum)
+        or (lnum == diagnostic.lnum)
     if show then
       table.insert(current_line_diag, diagnostic)
     end
@@ -17,10 +17,26 @@ local function render_current_line(diagnostics, ns, bufnr, opts)
   render.show(ns, bufnr, current_line_diag, opts)
 end
 
+--- @param diagnostics vim.Diagnostic[]
+--- @return vim.Diagnostic[]
+local function reformat_diagnostics(format, diagnostics)
+  vim.validate({
+    format = { format, 'f' },
+    diagnostics = { diagnostics, 't' },
+  })
+
+  local formatted = vim.deepcopy(diagnostics, true)
+  for _, diagnostic in ipairs(formatted) do
+    diagnostic.message = format(diagnostic)
+  end
+  return formatted
+end
+
 ---@class Opts
 ---@field virtual_lines OptsVirtualLines Options for lsp_lines plugin
 
 ---@class OptsVirtualLines
+---@field format function
 ---@field only_current_line boolean Only render for current line
 ---@field highlight_whole_line boolean Highlight empty space to the left of a diagnostic
 
@@ -41,6 +57,9 @@ M.setup = function()
       end
 
       vim.api.nvim_clear_autocmds({ group = "LspLines" })
+      if opts.virtual_lines.format then
+        diagnostics = reformat_diagnostics(opts.virtual_lines.format, diagnostics)
+      end
       if opts.virtual_lines.only_current_line then
         vim.api.nvim_create_autocmd("CursorMoved", {
           buffer = bufnr,
@@ -69,6 +88,7 @@ end
 
 ---@return boolean
 M.toggle = function()
+  ---@diagnostic disable-next-line: undefined-field
   local new_value = not vim.diagnostic.config().virtual_lines
   vim.diagnostic.config({ virtual_lines = new_value })
   return new_value
